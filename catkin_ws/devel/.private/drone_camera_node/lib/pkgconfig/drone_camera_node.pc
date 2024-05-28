@@ -1,0 +1,8 @@
+prefix=/home/yeonarom/catkin_ws/devel/.private/drone_camera_node
+
+Name: drone_camera_node
+Description: Description of drone_camera_node
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 
