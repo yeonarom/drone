@@ -28,7 +28,8 @@ class ObjectDetector:
             detected_objects = self.detect_objects(cv_image)
             marker_array_msg = self.create_marker_message(detected_objects)
             self.marker_pub.publish(marker_array_msg)
-
+            ''' 
+            # bounding box visualize
             bboxes = []
             labels = []
             for object in detected_objects:
@@ -38,7 +39,8 @@ class ObjectDetector:
 
             img = bbv.draw_multiple_rectangles(cv_image, bboxes)
             img = bbv.add_multiple_labels(img, labels, bboxes)
-            cv2.imshow("Image", img)
+            '''
+            cv2.imshow("Image", cv_image)
             cv2.waitKey(1)
             
             self.publish_camera_tf()
