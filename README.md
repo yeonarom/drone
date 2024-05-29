@@ -10,11 +10,11 @@
 - `object_detection.py` : 드론에서 Object Detection 수행
 
 ## drone
-`drone_control` : 드론 이착륙
+`drone_control.py` : 드론 이착륙
 
-`drone_location` : 드론 이착륙 및 특정 GPS로 이동
+`drone_location.py` : 드론 이착륙 및 특정 GPS로 이동
 
-`drone_status` : 드론 상태 확인
+`drone_status.py` : 드론 상태 확인
 
 # Use
 ## PX4_Autopilot
