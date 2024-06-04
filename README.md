@@ -9,6 +9,10 @@
 
 - `object_detection.py` : 드론에서 Object Detection 수행
 
+- `object_tracking.py` : 드론에서 Object Tracking 수행
+
+- `sort.py` : SORT 알고리즘, <https://github.com/abewley/sort?tab=readme-ov-file>
+
 ## drone
 `drone_activate.py` : 드론 이착륙
 
