@@ -6,6 +6,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from visualization_msgs.msg import Marker, MarkerArray
 import cv2
 import torch
+import torchvision
 from ultralytics import YOLO
 import tf2_ros
 from geometry_msgs.msg import TransformStamped
@@ -13,6 +14,28 @@ import tf.transformations as tf_trans
 from sort import Sort
 import numpy as np
 from std_msgs.msg import ColorRGBA
+import os
+import torchreid
+
+class ReidModel:
+    def __init__(self, model_path):
+        self.model = torchreid.models.build_model(name='resnet50', num_classes=751, pretrained=True)
+        torchreid.utils.load_pretrained_weights(self.model, model_path)
+        self.model.eval()
+
+    def extract_features(self, image):
+        transform = torchvision.transforms.Compose([
+            torchvision.transforms.ToPILImage(),
+            torchvision.transforms.Resize((128, 256)),
+            torchvision.transforms.ToTensor(),
+        ])
+        image = transform(image).unsqueeze(0)
+        with torch.no_grad():
+            features = self.model(image)
+        return features
+
+    def compare_features(self, features1, features2):
+        return torch.nn.functional.cosine_similarity(features1, features2).item()
 
 class ObjectDetector:
     def __init__(self):
@@ -20,8 +43,11 @@ class ObjectDetector:
         self.image_sub = rospy.Subscriber("/camera/image_raw", Image, self.image_callback)
         self.marker_pub = rospy.Publisher("/object_markers", MarkerArray, queue_size=10)
         
-        self.model = YOLO('./yolov8n.pt')
+        self.model = YOLO('./src/drone_camera_node/scripts/yolov8n.pt')
         self.tracker = Sort()
+        self.reid_model = ReidModel('./src/drone_camera_node/scripts/market.pth')
+
+        self.object_features = {}
         
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
 
@@ -30,19 +56,16 @@ class ObjectDetector:
             cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
             detected_objects, detected_objects_2_track = self.detect_objects(cv_image)
             tracked_objects = self.track_objects(detected_objects_2_track)
-
-            if tracked_objects is None:
-                labels = tracked_objects
-            else:
+            
+            if tracked_objects is not None:
                 labels = np.array(detected_objects).T[4]
-
-            marker_objs = self.create_marker_message(tracked_objects, labels)
-            self.marker_pub.publish(marker_objs)
-            #self.marker_pub.publish(marker_texts)
-            
-            self.visualization(cv_image, tracked_objects)
-            
-            self.publish_camera_tf()
+                reidentified_objects = self.reidentify_objects(cv_image, tracked_objects, labels)
+                marker_objs = self.create_marker_message(tracked_objects, reidentified_objects)
+                self.marker_pub.publish(marker_objs)
+                
+                self.visualization(cv_image, tracked_objects, reidentified_objects)
+                
+                self.publish_camera_tf()
         except CvBridgeError as e:
             print(e)
 
@@ -63,25 +86,39 @@ class ObjectDetector:
     
     def track_objects(self, detected_objects):
         tracked_objects = self.tracker.update(detected_objects)
-
         return tracked_objects
     
-    def visualization(self, image, tracked_objects):
-        for obj in tracked_objects:
+    def reidentify_objects(self, image, tracked_objects, labels):
+        reidentified_objects = []
+        for obj, label in zip(tracked_objects, labels):
+            x1, y1, x2, y2, track_id = obj
+            cropped_image = image[int(y1):int(y2), int(x1):int(x2)]
+            features = self.reid_model.extract_features(cropped_image)
+            if track_id in self.object_features:
+                similarity = self.reid_model.compare_features(self.object_features[track_id], features)
+                if similarity > 0.5:
+                    reidentified_objects.append(label)
+                else:
+                    reidentified_objects.append(f"{label}_new")
+            else:
+                self.object_features[track_id] = features
+                reidentified_objects.append(label)
+        return reidentified_objects
+    
+    def visualization(self, image, tracked_objects, reidentified_objects):
+        for obj, label in zip(tracked_objects, reidentified_objects):
             x1, y1, x2, y2, track_id = obj
             cv2.rectangle(image, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
-            cv2.putText(image, str(int(track_id)), (int(x1), int(y1)-10), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
+            cv2.putText(image, str(int(track_id)) + ":" + label, (int(x1), int(y1)-10), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
 
         cv2.imshow("Image", image)
         cv2.waitKey(1)
 
-    def create_marker_message(self, tracked_objects, labels):
+    def create_marker_message(self, tracked_objects, reidentified_objects):
         marker_objs = MarkerArray()
-        marker_texts = MarkerArray()
         
-        for i, obj in enumerate(tracked_objects):
+        for i, (obj, label) in enumerate(zip(tracked_objects, reidentified_objects)):
             x1, y1, x2, y2, track_id = obj
-            cls_label = labels[i]
             marker = Marker()
             marker.header.frame_id = "camera_link"
             marker.header.stamp = rospy.Time.now()
@@ -96,23 +133,7 @@ class ObjectDetector:
             marker.scale.y = (y2 - y1) / 100
             marker.scale.z = 0.1
             marker.color = self.get_color(track_id)
-            marker.text = str(int(track_id)) + ":" + cls_label
-
-            # text = Marker()
-            # text.header.frame_id = "camera_link"
-            # text.header.stamp = rospy.Time.now()
-            # text.ns = "objects"
-            # text.id = i
-            # text.type = Marker.TEXT_VIEW_FACING
-            # text.action = Marker.ADD
-            # text.pose.position.x = x1 / 100
-            # text.pose.position.y = y1 / 100 + 0.5
-            # text.pose.position.z = 0.5
-            # text.scale.x = (x2 - x1) / 100
-            # text.scale.y = (y2 - y1) / 100
-            # text.scale.z = 0.4
-            # text.color = ColorRGBA(1.0, 1.0, 1.0, 1.0)
-            # text.text = str(int(track_id)) + ":" + cls_label
+            marker.text = str(int(track_id)) + ":" + label
 
             # Quaternion 초기화
             quat = tf_trans.quaternion_from_euler(0, 0, 0)
@@ -122,9 +143,8 @@ class ObjectDetector:
             marker.pose.orientation.w = quat[3]
 
             marker_objs.markers.append(marker)
-            #marker_texts.markers.append(text)
         
-        return marker_objs#, marker_texts
+        return marker_objs
     
     def get_color(self, track_id):
         colors = [
@@ -144,7 +164,7 @@ class ObjectDetector:
         t.child_frame_id = "camera_link"
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
-        t.transform.translation.z = 1.0  # 카메라 높이를 적절히 설정하십시오.
+        t.transform.translation.z = 1.0
         t.transform.rotation.x = 0.0
         t.transform.rotation.y = 0.0
         t.transform.rotation.z = 0.0
