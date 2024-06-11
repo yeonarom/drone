@@ -11,6 +11,8 @@
 
 - `object_tracking.py` : 드론에서 Object Tracking 수행
 
+- `object_reid.py` : 드론에서 Re-Identification 수행
+
 - `sort.py` : SORT 알고리즘, <https://github.com/abewley/sort?tab=readme-ov-file>
 
 ## drone
