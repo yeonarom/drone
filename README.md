@@ -1,7 +1,7 @@
 # drone
 드론 동작 구현을 위한 repository
-## catkin_ws
-`src/drone_camera_node` : 카메라가 연결된 드론 동작을 위한 node
+## catkin_ws/src
+#### `drone_camera_node` : 카메라가 연결된 드론 동작 테스트를 위한 Node
 
 - `image_subscriber.py` : 카메라 이미지를 받아와 시각화
 
@@ -12,6 +12,21 @@
 - `object_tracking.py` : 드론에서 Object Tracking 수행
 
 - `sort.py` : SORT 알고리즘, <https://github.com/abewley/sort?tab=readme-ov-file>
+
+#### `drone_operation` : 드론 기능 구현 및 연결을 위한 Node
+- `main_node.py` : 최상위 Node
+
+- `drone_camera.py` : detection-tracking-reidentification 테스트를 위한 Node
+
+- `drone_controller.py` : 드론 arm, takeoff, land, disarm의 기능 Service call 제공을 위한 Node
+
+- `object_detection.py` : 객체 detection 클래스
+
+- `object_tracking.py` : 객체 tracking 클래스
+
+- `object_reidentification.py` : 객체 reidentification 클래스
+
+- `visualize.py` : detection 및 tracking의 결과 시각화 클래스
 
 ## drone
 `drone_activate.py` : 드론 이착륙
@@ -42,6 +57,7 @@ catkin build
 source ~/catkin/devel/setup.bash
 chmod +x ~/catkin_ws/src/drone_camera_node/scripts/image_subscriber.py
 rosrun drone_camera_node image_subscriber.py
+roslaunch drone_operation main_node.py
 ```
 ## Rviz
 ```sh
