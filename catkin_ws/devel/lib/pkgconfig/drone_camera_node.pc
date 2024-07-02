@@ -1,1 +1,0 @@
-/home/yeonarom/catkin_ws/devel/.private/drone_camera_node/lib/pkgconfig/drone_camera_node.pc
