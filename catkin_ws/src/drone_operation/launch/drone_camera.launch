@@ -1,0 +1,4 @@
+<launch>
+    <!-- 노드를 실행 -->
+    <node pkg="drone_operation" type="drone_camera.py" name="drone_camera" output="screen"/>
+</launch>
