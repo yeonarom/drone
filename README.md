@@ -11,8 +11,6 @@
 
 - `object_tracking.py` : 드론에서 Object Tracking 수행
 
-- `sort.py` : SORT 알고리즘, <https://github.com/abewley/sort?tab=readme-ov-file>
-
 #### `drone_operation` : 드론 기능 구현 및 연결을 위한 Node
 - `main_node.py` : 최상위 Node
 
